@@ -68,7 +68,7 @@ private:
 	cl_kernel kernel;
 
 
-	_Bool board[ 6144 * 6144];
+	_Bool  * board;//[ 32*32];
 	cl_mem input;
 	cl_mem output;
 	cl_device_id device_id;
@@ -76,5 +76,7 @@ private:
 	void printBoard();
 
 	float elapsedTimeSinceLastReset;
+	ofFile file;
+	int elapsedFrames;
 };
 

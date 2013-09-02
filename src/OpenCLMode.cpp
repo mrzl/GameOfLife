@@ -6,12 +6,14 @@
 
 
 OpenCLMode::OpenCLMode(void):
-	dimension(6144),
-	running(true)
+	dimension(1024),
+	running(true),
+	file(ofToDataPath("opencl.csv"), ofFile::WriteOnly),
+	elapsedFrames(0)
 {
 
 
-	//board = new _Bool[ dimension * dimension ];
+	board = new _Bool[ dimension * dimension ];
 
 	std::cout << "OpenCLMode" << "\n";
 }
@@ -87,19 +89,29 @@ void OpenCLMode::update()
 {
 	if( ofGetElapsedTimef() - elapsedTimeSinceLastReset > 5 )
 	{
-		running = false;
+		//running = false;
 	}
+
+	if( elapsedFrames > 50) {
+		running = false;
+	} 
+	else 
+	{
+		running = true;
+	}
+
 
 	if(running)
 	{
+		//std::cout << "updateing" << std::endl,
 		//printBoard();
 		calculationTimer->start();
 		updateOpenCLBoolStuff( device_id );
 		//printBoard();
-		colony->populateOpenCL();
+		//colony->populateOpenCL();
 		//std::cout << "Starting to update the colony." << std::endl;
 
-		for( size_t i = 0; i < dimension; ++i )
+		/*for( size_t i = 0; i < dimension; ++i )
 		{
 			for( size_t j = 0; j < dimension; ++j )
 			{
@@ -109,10 +121,30 @@ void OpenCLMode::update()
 				//std::cout  << "=" << c->isAlive() << " ";
 			}
 			//std::cout << std::endl;
-		}
+		}*/
 		calculationTimer->stop();
 		calculationTimer->store();
+		elapsedFrames++;
 		//std::cout << "Finished to update the colony." << std::endl;
+	}else 
+	{
+
+		std::cout << dimension << std::endl;
+		//dimension += 50;
+		elapsedFrames = 0;
+		float elapsed = calculationTimer->getAverageTime();
+		//elapsed += colony->getAdvanceTimer()->getAverageTime();
+		std::cout << dimension << "," << elapsed << std::endl;
+		exit(1);
+		//benchmarks.push_back(elapsed);
+		
+		if(dimension == 4000)
+		{
+			file.close();
+			std::cout << "Finished" << std::endl;
+
+		}
+		restart();
 	}
 }
 
@@ -411,7 +443,7 @@ void OpenCLMode::startDeviceSelector( void )
 		cl_ulong max_mem_alloc;
 		errNum = clGetDeviceInfo( deviceIds[ i ], CL_DEVICE_MAX_MEM_ALLOC_SIZE, sizeof( max_mem_alloc), &max_mem_alloc, nullptr );
 		std::cout << "CL_DEVICE_MAX_MEM_ALLOC_SIZE = " << max_mem_alloc << std::endl;
-		std::cout << "I am allocating  " << dimension * dimension * 2 << std::endl;
+		std::cout << "I am allocating  " << dimension * dimension  << std::endl;
 	}
 
 	size_t choosenDevice;
@@ -471,24 +503,28 @@ void OpenCLMode::updateOpenCLBoolStuff( cl_device_id device_id)
 	size_t workgroup_size;
 	err = clGetKernelWorkGroupInfo(kernel, device_id, CL_KERNEL_WORK_GROUP_SIZE,
 		sizeof(size_t), &workgroup_size, NULL);
-
+	//workgroup_size = 32;
 	if (err != CL_SUCCESS) 
 	{ 
 		std::cout << "ErrorNr was : " << err << std::endl;
 		fail("Unable to get kernel work-group size"); 
 	}
 
+	size_t local_workgroup_size = 32;
+
+	//std::cout << "sizeof( board ) " << sizeof( *board ) * dimension * dimension << std::endl;
+
 	//std::cout << "Successfully got the kernel work group size." << std::endl;
 
 	// the buffer is copied to the openCL stack. to the input cl_mem object.
 	err = clEnqueueWriteBuffer(commandQueue, input, CL_TRUE, 0,
-		sizeof( board ), board, 0, NULL, NULL);
+		sizeof( *board ) * dimension * dimension, board, 0, NULL, NULL);
 	if (err != CL_SUCCESS) { fail("Unable to enqueue buffer"); }
 
 	// enqueues the kernel to be run. on the given commandqueue and kernel.
 	size_t board_size = dimension * dimension;
 	err = clEnqueueNDRangeKernel(commandQueue, kernel, 1, NULL, &board_size,
-		&workgroup_size, 0, NULL, NULL);
+		&dimension, 0, NULL, NULL);
 	if (err) 
 	{
 		std::cout << "Workgroup size: " << workgroup_size << std::endl;
@@ -500,13 +536,13 @@ void OpenCLMode::updateOpenCLBoolStuff( cl_device_id device_id)
 	//std::cout << "Copying output to the input for the next iteration." << std::endl;
 	// copies the output buffer to the input buffer for the next iteration
 	err = clEnqueueCopyBuffer(commandQueue, output, input, 0, 0,
-		sizeof( board ), 0, NULL, NULL);
+		sizeof( *board )* dimension * dimension, 0, NULL, NULL);
 	if (err) { fail("Unable to enqueue copy"); }
 
 
 	// reads the output buffer into the board object in order to display it on the screen.
 	err = clEnqueueReadBuffer(commandQueue, output, CL_TRUE, 0,
-		sizeof( board ), board, 0, NULL, NULL );
+		sizeof( *board )* dimension * dimension, board, 0, NULL, NULL );
 	if (err != CL_SUCCESS) { fail("Unable to read results"); }
 	//std::cout << "Trying to print out board." << std::endl;
 	//printBoard();
@@ -621,9 +657,9 @@ void OpenCLMode::createKernel(cl_device_id device, cl_context _context )
 
 	kernel = createKernelFromSource( device, _context, kernel_source, "life" );
 	std::cout << "Successfully created Kernel." << std::endl;
-	input = clCreateBuffer(context,  CL_MEM_READ_ONLY,  sizeof( board ), NULL,
+	input = clCreateBuffer(context,  CL_MEM_READ_ONLY,  sizeof( *board )* dimension * dimension, NULL,
 		NULL);
-	output = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof( board ), NULL,
+	output = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof( *board )* dimension * dimension, NULL,
 		NULL);
 	if (!input || !output) { fail("Unable to create buffers"); }
 
@@ -631,8 +667,8 @@ void OpenCLMode::createKernel(cl_device_id device, cl_context _context )
 	int err = 0;
 	err  = clSetKernelArg(kernel, 0, sizeof(cl_mem), &input);
 	err |= clSetKernelArg(kernel, 1, sizeof(cl_mem), &output);
-	err |= clSetKernelArg(kernel, 2, sizeof(unsigned int), &dimension );
-	err |= clSetKernelArg(kernel, 3, sizeof(unsigned int), &dimension );
+	err |= clSetKernelArg(kernel, 2, sizeof(dimension), &dimension );
+	err |= clSetKernelArg(kernel, 3, sizeof(dimension), &dimension );
 	if (err != CL_SUCCESS) { fail("Unable to set arguments"); }
 }
 

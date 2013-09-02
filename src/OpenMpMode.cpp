@@ -4,7 +4,7 @@
 OpenMpMode::OpenMpMode(void):
 	dimension(50),
 	running(false),
-	file(ofToDataPath("openmp.csv"), ofFile::WriteOnly ),
+	file(ofToDataPath("empty2"), ofFile::WriteOnly ),
 	elapsedFrames( 0 )
 {
 	std::cout << "OpenMpMode" << "\n";

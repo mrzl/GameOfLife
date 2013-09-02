@@ -23,7 +23,7 @@ void testApp::setup(){
 	stateMachine.addState( new SequentialMode() );
 	stateMachine.addState( new OpenCLMode() );
 	stateMachine.addState( new GLSLMode() );
-	stateMachine.changeState( stateMachine.getSharedData().OPENMP );
+	stateMachine.changeState( stateMachine.getSharedData().OPENCL );
 }
 
 //--------------------------------------------------------------
