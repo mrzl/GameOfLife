@@ -1,7 +1,7 @@
 #include "GLSLMode.h"
 
 
-GLSLMode::GLSLMode(void) : dimension( 4096 ), running( true )
+GLSLMode::GLSLMode(void) : dimension( 100 ), running( true ), file( ofToDataPath("glsl.csv"), ofFile::WriteOnly), elapsedFrames(0)
 {
 	//ofDisableArbTex();
 	std::cout << "GLSLMode konstruktor" << std::endl;
@@ -34,16 +34,17 @@ void GLSLMode::stateEnter( void )
 
 	drawTimer = new Timer(); // starts the timer for the elapsed time during drawing the game of life.
 	updateTimer = new Timer();
-	
-	conway.allocate( dimension, dimension );
 
+	conway = new ofxFXObject();
+	
+	conway->allocate( dimension, dimension );
 	fbo.allocate( dimension, dimension );
 
-	conway.setPasses(1);
+	conway->setPasses(1);
 	//
 	// Created by kalwalt alias Walter Perdan on 24/12/11
 	// Copyright 2011 http://www.kalwaltart.it/ All rights reserved.
-	conway.setCode( "#version 120\n \
+	conway->setCode( "#version 120\n \
 					#extension GL_ARB_texture_rectangle : enable\n \
 					\
 					uniform sampler2DRect tex0; \
@@ -73,7 +74,7 @@ void GLSLMode::stateEnter( void )
 					else gl_FragColor = y; \
 					}");
 
-	//restart(); // restarts the entire animation
+	restart(); // restarts the entire animation
 
 }
 
@@ -86,22 +87,47 @@ void GLSLMode::update( void )
 {
 	float elapsed = ofGetElapsedTimef() - elapsedTimeSinceLastReset;
 	//elapsed > 5 ? running = false : running = true;
-
+	if( elapsedFrames > 50) {
+		running = false;
+	} 
+	else 
+	{
+		running = true;
+	}
 
 	if(running)
 	{
 	updateTimer->start();
-	conway.begin();
+	conway->begin();
 	//ofClear(0, 255);
-	conway.draw();
+	conway->draw();
 	ofSetColor(255,255);
 	ofRect( ofGetMouseX(), ofGetMouseY(), 2, 2 );
-	conway.end();
+	conway->end();
 
-	conway.update();
+	conway->update();
 	updateTimer->stop();
 	updateTimer->store();
+	elapsedFrames++;
+	}else 
+	{
 
+		std::cout << dimension << std::endl;
+		dimension += 50;
+		elapsedFrames = 0;
+		float elapsed = updateTimer->getAverageTime();
+		std::cout << "drawtimer: " << drawTimer->getAverageTime() << std::endl;
+		std::cout << "updatetimer: " << updateTimer->getAverageTime() << std::endl;
+		//elapsed += colony->getAdvanceTimer()->getAverageTime();
+		file << dimension << "," << elapsed << std::endl;
+		//benchmarks.push_back(elapsed);
+		if(dimension == 4000)
+		{
+			file.close();
+			std::cout << "Finished" << std::endl;
+
+		}
+		restart();
 	}
 	//ofSetWindowTitle(ofToString(ofGetFrameRate()));
 }
@@ -110,7 +136,7 @@ void GLSLMode::draw( void )
 {
 	drawTimer->start();
 	fbo.begin();
-	conway.draw();
+	conway->draw();
 	fbo.end();
 	fbo.draw(0, 0, ofGetWidth(), ofGetHeight() );
 	drawTimer->stop();
@@ -168,11 +194,12 @@ void GLSLMode::restart( void )
 	delete updateTimer;
 	updateTimer = new Timer();
 
-	init();
-
 	elapsedTimeSinceLastReset = ofGetElapsedTimef();
 	running = true;
 	
+
+	init();
+	//init();
 }
 
 void GLSLMode::clean( void )
@@ -223,13 +250,50 @@ void GLSLMode::guiEvent( ofxUIEventArgs &e )
 
 void GLSLMode::init()
 {
-	
+	delete conway;
+	conway = new ofxFXObject();
+	conway->allocate( dimension, dimension );
+	//conway.set()
+	//conway->setPasses(1);
+
+	fbo.allocate( dimension, dimension );
+
+	conway->setPasses(1);
+	conway->setCode( "#version 120\n \
+					 #extension GL_ARB_texture_rectangle : enable\n \
+					 \
+					 uniform sampler2DRect tex0; \
+					 \
+					 vec4 dead = vec4(0.0,0.0,0.0,1.0); \
+					 vec4 alive = vec4(1.0,1.0,1.0,1.0); \
+					 \
+					 void main(void) { \
+					 vec2  st = gl_TexCoord[0].st;\
+					 int sum = 0; \
+					 vec4 y = texture2DRect(tex0, st); \
+					 \
+					 if (texture2DRect(tex0, st + vec2(-1.0, -1.0)) == alive) ++sum; \
+					 if (texture2DRect(tex0, st + vec2(0.0, -1.0)) == alive) ++sum; \
+					 if (texture2DRect(tex0, st + vec2(1.0, -1.0)) == alive) ++sum; \
+					 \
+					 if (texture2DRect(tex0, st + vec2(-1.0, 0.0)) == alive) ++sum; \
+					 if (texture2DRect(tex0, st + vec2(1.0, 0.0)) == alive) ++sum; \
+					 \
+					 if (texture2DRect(tex0, st + vec2(-1.0, 1.0)) == alive) ++sum; \
+					 if (texture2DRect(tex0, st + vec2(0.0, 1.0)) == alive) ++sum; \
+					 if (texture2DRect(tex0, st + vec2(1.0, 1.0)) == alive) ++sum; \
+					 \
+					 if (sum < 2) gl_FragColor = dead; \
+					 else if (sum > 3) gl_FragColor = dead; \
+					 else if (sum == 3) gl_FragColor = alive; \
+					 else gl_FragColor = y; \
+					 }");
 
 	int w = dimension;
 	int h = dimension;
-	conway.begin();
+	conway->begin();
 	ofClear(0, 255);
-	conway.draw();
+	conway->draw();
 	ofSetColor(255,255);
 	for( int y = 0; y < h; y++ ) 
 	{
@@ -248,6 +312,31 @@ void GLSLMode::init()
 		}
 	}
 
-	conway.end();
-	conway.update();
+	conway->end();
+	conway->update();
+
+	// second time for some unknown reason :-)
+	conway->begin();
+	ofClear(0, 255);
+	conway->draw();
+	ofSetColor(255,255);
+	for( int y = 0; y < h; y++ ) 
+	{
+		for( int x = 0; x < w; x++ ) 
+		{
+			bool rnd = ofRandomf() > 0.0 ? true : false;
+			if( rnd ) 
+			{
+				ofSetColor( 0.0, 255.0 );
+			} 
+			else
+			{
+				ofSetColor( 255.0, 255.0 );
+			}
+			ofRect( x, y, 1, 1);
+		}
+	}
+
+	conway->end();
+	conway->update();
 }

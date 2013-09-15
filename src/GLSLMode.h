@@ -38,8 +38,11 @@ private:
 	void clean(void); // cleans some objects
 	void guiEvent(ofxUIEventArgs &e); // callback method for gui events
 
-	ofxFXObject  conway;
+	ofxFXObject * conway;
 	ofFbo fbo;
+
+	ofFile file;
+	int elapsedFrames;
 
 	void init();
 };
