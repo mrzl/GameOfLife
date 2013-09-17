@@ -3,11 +3,12 @@
 
 OpenMpMode::OpenMpMode(void):
 	dimension(50),
-	running(false),
-	file(ofToDataPath("empty2"), ofFile::WriteOnly ),
+	running(true),
+	file(ofToDataPath("benchmark_openmp_mode.csv"), ofFile::WriteOnly ),
 	elapsedFrames( 0 )
 {
 	std::cout << "OpenMpMode" << "\n";
+
 }
 
 OpenMpMode::~OpenMpMode(void)
@@ -27,7 +28,7 @@ void OpenMpMode::stateEnter(void)
 	gui->setAutoDraw(false);
 	gui->setColorBack(ofColor(0, 200));  
 	gui->addWidgetDown(new ofxUILabel("Game of Life (OpenMP)", OFX_UI_FONT_LARGE)); 
-	gui->addWidgetDown(new ofxUISlider(300,20,0,6144,10.0,"RESOLUTION")); 
+	gui->addWidgetDown(new ofxUISlider(300,20,0,6144,dimension,"RESOLUTION")); 
 	gui->addWidgetDown(new ofxUIButton(32, 32, false, "REINIT"));
 	gui->addWidgetDown(new ofxUISlider(300,20,0,1,0.0,"RANDOMCHANCE")); 
 	gui->addWidgetDown(new ofxUIToggle(32, 32, true, "RUNNING"));
@@ -53,35 +54,36 @@ void OpenMpMode::stateExit(void)
 */
 void OpenMpMode::update()
 {
-	float elapsed = ofGetElapsedTimef() - elapsedTimeSinceLastReset;
-	//elapsed > 5 ? running = false : running = true;
-	if( elapsedFrames > 50) {
-		running = false;
-	} 
-	else 
+	if( getSharedData().isBenchmarkMode )
 	{
-		running = true;
+		if( elapsedFrames > 50) {
+			running = false;
+		} 
+		else 
+		{
+			running = true;
+		}
 	}
+	
 
 	if(running)
 	{
 		colony->populateOpenMP(getSharedData().numberOfCores);
 		elapsedFrames++;
-	}else 
+	}
+	else if( getSharedData().isBenchmarkMode && dimension < 4100 )
 	{
 		
-		std::cout << dimension << std::endl;
+		std::cout << "New dimension: " << dimension << std::endl;
 		dimension += 50;
 		elapsedFrames = 0;
 		float elapsed = colony->getUpdateNeighbourTimer()->getAverageTime();
 		elapsed += colony->getAdvanceTimer()->getAverageTime();
 		file << dimension << "," << elapsed << std::endl;
-		//benchmarks.push_back(elapsed);
 		if(dimension == 4000)
 		{
 			file.close();
-			std::cout << "Finished" << std::endl;
-			
+			std::cout << "Finished Benchmark for OpenMP mode." << std::endl;
 		}
 		restart();
 	}
@@ -109,7 +111,7 @@ void OpenMpMode::draw()
 			{
 				gol::Cell* c = colony->getCell(x, y);
 				if(c->isAlive()){
-						//ofRect(x * w, y * h, w, h);
+						ofRect(x * w, y * h, w, h);
 				}
 			}
 		}

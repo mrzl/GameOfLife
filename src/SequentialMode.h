@@ -35,7 +35,6 @@ private:
 
 	float elapsedTimeSinceLastReset;
 
-	std::vector< float > benchmarks;
 	ofFile file;
 	int elapsedFrames;
 };

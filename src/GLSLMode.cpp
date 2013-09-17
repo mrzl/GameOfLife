@@ -1,7 +1,7 @@
 #include "GLSLMode.h"
 
 
-GLSLMode::GLSLMode(void) : dimension( 100 ), running( true ), file( ofToDataPath("glsl.csv"), ofFile::WriteOnly), elapsedFrames(0)
+GLSLMode::GLSLMode(void) : dimension( 1000 ), running( true ), file( ofToDataPath("benchmark_glslmode.csv"), ofFile::WriteOnly), elapsedFrames(0)
 {
 	//ofDisableArbTex();
 	std::cout << "GLSLMode konstruktor" << std::endl;
@@ -23,7 +23,7 @@ void GLSLMode::stateEnter( void )
 	gui->setAutoDraw(false);
 	gui->setColorBack(ofColor(0, 200));  
 	gui->addWidgetDown(new ofxUILabel("Game of Life (GLSL)", OFX_UI_FONT_LARGE)); 
-	gui->addWidgetDown(new ofxUISlider(300,20,0,1000,10.0,"RESOLUTION")); 
+	gui->addWidgetDown(new ofxUISlider(300,20,0,6144,dimension,"RESOLUTION")); 
 	gui->addWidgetDown(new ofxUIButton(32, 32, false, "REINIT"));
 	gui->addWidgetDown(new ofxUISlider(300,20,0,1,0.0,"RANDOMCHANCE")); 
 	gui->addWidgetDown(new ofxUIToggle(32, 32, true, "RUNNING"));
@@ -85,51 +85,45 @@ void GLSLMode::stateExit( void )
 
 void GLSLMode::update( void )
 {
-	float elapsed = ofGetElapsedTimef() - elapsedTimeSinceLastReset;
-	//elapsed > 5 ? running = false : running = true;
-	if( elapsedFrames > 50) {
-		running = false;
-	} 
-	else 
+	if( getSharedData().isBenchmarkMode )
 	{
-		running = true;
+		if( elapsedFrames > 50) {
+			running = false;
+		} 
+		else 
+		{
+			running = true;
+		}
 	}
 
 	if(running)
 	{
-	updateTimer->start();
-	conway->begin();
-	//ofClear(0, 255);
-	conway->draw();
-	ofSetColor(255,255);
-	ofRect( ofGetMouseX(), ofGetMouseY(), 2, 2 );
-	conway->end();
+		updateTimer->start();
+		conway->begin();
+		conway->draw();
+		conway->end();
 
-	conway->update();
-	updateTimer->stop();
-	updateTimer->store();
-	elapsedFrames++;
-	}else 
+		conway->update();
+		updateTimer->stop();
+		updateTimer->store();
+		elapsedFrames++;
+	}
+	else if( getSharedData().isBenchmarkMode && dimension < 4100 )
 	{
 
 		std::cout << dimension << std::endl;
 		dimension += 50;
 		elapsedFrames = 0;
 		float elapsed = updateTimer->getAverageTime();
-		std::cout << "drawtimer: " << drawTimer->getAverageTime() << std::endl;
-		std::cout << "updatetimer: " << updateTimer->getAverageTime() << std::endl;
-		//elapsed += colony->getAdvanceTimer()->getAverageTime();
 		file << dimension << "," << elapsed << std::endl;
-		//benchmarks.push_back(elapsed);
 		if(dimension == 4000)
 		{
 			file.close();
-			std::cout << "Finished" << std::endl;
+			std::cout << "Finished Benchmark for GLSL mode." << std::endl;
 
 		}
 		restart();
 	}
-	//ofSetWindowTitle(ofToString(ofGetFrameRate()));
 }
 
 void GLSLMode::draw( void )
@@ -199,7 +193,6 @@ void GLSLMode::restart( void )
 	
 
 	init();
-	//init();
 }
 
 void GLSLMode::clean( void )
@@ -232,10 +225,7 @@ void GLSLMode::guiEvent( ofxUIEventArgs &e )
 	else if(e.widget->getName() == "REINIT")	
 	{
 		ofxUIToggle *toggle = (ofxUIToggle *) e.widget;
-		if(toggle->getValue() == false)
-		{
-			restart();
-		}
+		restart();
 	}  
 	// randomly kills/awakes cells
 	else if(e.widget->getName() == "RANDOM")

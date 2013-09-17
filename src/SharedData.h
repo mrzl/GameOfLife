@@ -48,6 +48,7 @@ public:
 	const std::string GLSL;
 
 	int dimension;
+	bool isBenchmarkMode;
 
 	
 	int numberOfCores;// number of CPU cores being present in the computer

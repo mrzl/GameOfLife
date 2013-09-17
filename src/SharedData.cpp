@@ -6,6 +6,7 @@
 SharedData::SharedData(void) : OPENMP( "OM" ), SEQUENTIAL( "SM" ), OPENCL( "CL" ), GLSL( "GLSL" ), dimension( 10 )
 {
 	numberOfCores = determineNumberOfCores();
+	this->isBenchmarkMode = false;
 }
 
 /*

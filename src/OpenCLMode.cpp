@@ -6,13 +6,11 @@
 
 
 OpenCLMode::OpenCLMode(void):
-	dimension(1024),
+	dimension(128),
 	running(true),
-	file(ofToDataPath("opencl.csv"), ofFile::WriteOnly),
+	file(ofToDataPath("benchmark_opencl_mode.csv"), ofFile::WriteOnly),
 	elapsedFrames(0)
 {
-
-
 	board = new _Bool[ dimension * dimension ];
 
 	std::cout << "OpenCLMode" << "\n";
@@ -30,14 +28,9 @@ void OpenCLMode::stateEnter(void)
 {
 	colony = new gol::Colony(dimension);
 
-
-
 	startDeviceSelector();
 	// initOpenCLStuff();
 	initOpenCLBoolStuff();
-
-
-
 
 
 	// creates a new gui and adds several sliders and buttons
@@ -45,7 +38,7 @@ void OpenCLMode::stateEnter(void)
 	gui->setAutoDraw(false);
 	gui->setColorBack(ofColor(0, 200));  
 	gui->addWidgetDown(new ofxUILabel("Game of Life (OpenCL)", OFX_UI_FONT_LARGE)); 
-	gui->addWidgetDown(new ofxUISlider(300,20,0,2000,10.0,"RESOLUTION")); 
+	gui->addWidgetDown(new ofxUISlider(300,20,0,6144,dimension,"RESOLUTION")); 
 	gui->addWidgetDown(new ofxUIButton(32, 32, false, "REINIT"));
 	gui->addWidgetDown(new ofxUISlider(300,20,0,1,0.0,"RANDOMCHANCE")); 
 	gui->addWidgetDown(new ofxUIToggle(32, 32, true, "RUNNING"));
@@ -87,62 +80,51 @@ size_t OpenCLMode::roundUp(int groupSize, int globalSize)
 */
 void OpenCLMode::update()
 {
-	if( ofGetElapsedTimef() - elapsedTimeSinceLastReset > 5 )
+	
+	if( getSharedData().isBenchmarkMode )
 	{
-		//running = false;
+		if( elapsedFrames > 50) {
+			running = false;
+		} 
+		else 
+		{
+			running = true;
+		}
 	}
-
-	if( elapsedFrames > 50) {
-		running = false;
-	} 
-	else 
-	{
-		running = true;
-	}
-
 
 	if(running)
 	{
-		//std::cout << "updateing" << std::endl,
-		//printBoard();
 		calculationTimer->start();
 		updateOpenCLBoolStuff( device_id );
-		//printBoard();
-		//colony->populateOpenCL();
-		//std::cout << "Starting to update the colony." << std::endl;
-
-		/*for( size_t i = 0; i < dimension; ++i )
-		{
-			for( size_t j = 0; j < dimension; ++j )
-			{
-				int pos = i * dimension + j;
-				gol::Cell * c = colony->getCell(j, i);
-				c->setAlive( board[ pos ] );
-				//std::cout  << "=" << c->isAlive() << " ";
-			}
-			//std::cout << std::endl;
-		}*/
+		
 		calculationTimer->stop();
 		calculationTimer->store();
-		elapsedFrames++;
-		//std::cout << "Finished to update the colony." << std::endl;
-	}else 
-	{
 
-		std::cout << dimension << std::endl;
-		//dimension += 50;
+		// updating the board so it can be displayed. this could be displayed right away to gain some more performance but its not benchmarked anyways so left like this for clearer code
+		for( int i = 0; i < dimension; ++i )
+		{
+			for( int j = 0; j < dimension; ++j )
+			{
+				int pos = i * dimension + j;
+				bool alive = board[ pos ];
+				colony->setCell( i, j, alive );
+			}
+		}
+
+		elapsedFrames++;
+	}
+	else if( getSharedData().isBenchmarkMode && dimension < 4097 )
+	{
+		std::cout << "New Dimension: " << dimension << std::endl;
+		
 		elapsedFrames = 0;
 		float elapsed = calculationTimer->getAverageTime();
-		//elapsed += colony->getAdvanceTimer()->getAverageTime();
-		std::cout << dimension << "," << elapsed << std::endl;
-		exit(1);
-		//benchmarks.push_back(elapsed);
-		
-		if(dimension == 4000)
+		file << dimension << "," << elapsed << std::endl;
+		dimension += 128;
+		if(dimension > 4097)
 		{
 			file.close();
-			std::cout << "Finished" << std::endl;
-
+			std::cout << "Finished Benchmark for OpenCL mode." << std::endl;
 		}
 		restart();
 	}
@@ -282,6 +264,8 @@ void OpenCLMode::restart(void)
 	calculationTimer = new Timer();
 
 	elapsedTimeSinceLastReset = ofGetElapsedTimef();
+
+	initOpenCLBoolStuff();
 }
 
 /*
@@ -444,6 +428,12 @@ void OpenCLMode::startDeviceSelector( void )
 		errNum = clGetDeviceInfo( deviceIds[ i ], CL_DEVICE_MAX_MEM_ALLOC_SIZE, sizeof( max_mem_alloc), &max_mem_alloc, nullptr );
 		std::cout << "CL_DEVICE_MAX_MEM_ALLOC_SIZE = " << max_mem_alloc << std::endl;
 		std::cout << "I am allocating  " << dimension * dimension  << std::endl;
+
+		size_t ret[3];
+		errNum = clGetDeviceInfo( deviceIds[ i ], CL_DEVICE_MAX_WORK_ITEM_SIZES, sizeof( ret ), &ret, nullptr );
+
+		std::cout << "DEBUG:" << std::endl;
+		std::cout << "CL_DEVICE_MAX_WORK_ITEM_SIZES = " << ret[0] << " " << ret[1] << " " << ret[2] << std::endl;
 	}
 
 	size_t choosenDevice;
@@ -469,7 +459,8 @@ void OpenCLMode::fail( std::string errorMsg)
 
 void OpenCLMode::initOpenCLBoolStuff()
 {
-	//board = new bool[ dimension * dimension ];
+	delete board;
+	board = new bool[ dimension * dimension ];
 
 	// initializing a random array
 	for( size_t i = 0; i < dimension * dimension; ++i )
@@ -510,7 +501,7 @@ void OpenCLMode::updateOpenCLBoolStuff( cl_device_id device_id)
 		fail("Unable to get kernel work-group size"); 
 	}
 
-	size_t local_workgroup_size = 32;
+	//std::cout << "Workgroup Size: " << workgroup_size << std::endl;
 
 	//std::cout << "sizeof( board ) " << sizeof( *board ) * dimension * dimension << std::endl;
 
@@ -524,7 +515,7 @@ void OpenCLMode::updateOpenCLBoolStuff( cl_device_id device_id)
 	// enqueues the kernel to be run. on the given commandqueue and kernel.
 	size_t board_size = dimension * dimension;
 	err = clEnqueueNDRangeKernel(commandQueue, kernel, 1, NULL, &board_size,
-		&dimension, 0, NULL, NULL);
+		&workgroup_size, 0, NULL, NULL);
 	if (err) 
 	{
 		std::cout << "Workgroup size: " << workgroup_size << std::endl;

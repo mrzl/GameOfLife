@@ -4,6 +4,8 @@
 #include "OpenCLMode.h"
 #include "GLSLMode.h"
 
+
+
 testApp::testApp(void)
 {
 	SYSTEM_INFO sysinfo;
@@ -17,13 +19,13 @@ testApp::~testApp(void)
 }
 
 void testApp::setup(){
-	//ofEnableAlphaBlending();
+	ofEnableAlphaBlending();
 	ofSetFrameRate( 500 );
 	stateMachine.addState( new OpenMpMode() );
 	stateMachine.addState( new SequentialMode() );
 	stateMachine.addState( new OpenCLMode() );
 	stateMachine.addState( new GLSLMode() );
-	stateMachine.changeState( stateMachine.getSharedData().OPENCL );
+	stateMachine.changeState( stateMachine.getSharedData().GLSL );
 }
 
 //--------------------------------------------------------------
