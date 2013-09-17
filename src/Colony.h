@@ -39,6 +39,7 @@ public:
 	void draw();
 
 	void setCell(int x, int y, Cell* c);
+	void setCell( int x, int y, bool status );
 
 private:
 	vector<gol::Cell*> cells; // contains all cells

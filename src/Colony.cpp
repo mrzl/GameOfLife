@@ -276,6 +276,11 @@ void gol::Colony::setCell(int x, int y, Cell* c)
 	cells[x+y*dimension]->alive = c->alive;// = c;
 }
 
+void gol::Colony::setCell( int x, int y, bool status )
+{
+	cells[x+y*dimension]->alive = status;
+}
+
 int gol::Colony::getWidth(void)
 {
 	return dimension;
